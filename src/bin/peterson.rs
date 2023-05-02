@@ -1,10 +1,10 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::{thread, time::Duration};
 
 use locks::{random, LockID};
 
 struct PetersonLock {
-    victim: Arc<*mut usize>,
-    flag: Arc<*mut [bool; 2]>,
+    victim: *mut usize,
+    flag: *mut [bool; 2],
 }
 
 unsafe impl Send for PetersonLock {}
@@ -23,10 +23,7 @@ impl PetersonLock {
         let victim = Box::into_raw(Box::new(0));
         let flag = Box::into_raw(Box::new([false, false]));
 
-        Self {
-            victim: Arc::new(victim),
-            flag: Arc::new(flag),
-        }
+        Self { victim, flag }
     }
 }
 
@@ -34,10 +31,10 @@ impl LockID for PetersonLock {
     fn lock(&self, id: usize) {
         let j = 1 - id;
         unsafe {
-            (*(*self.flag))[id] = true; // Declare interest
-            (*(*self.victim)) = id; // Give way
+            (*self.flag)[id] = true; // Declare interest
+            (*self.victim) = id; // Give way
 
-            while (*(*self.flag))[j] && (*(*self.victim)) == id {}
+            while (*self.flag)[j] && (*self.victim) == id {}
         }
     }
 

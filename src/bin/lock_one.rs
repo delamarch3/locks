@@ -1,11 +1,10 @@
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use locks::LockID as LockOneT;
 
 struct LockOne {
-    flag: Arc<*mut [bool; 2]>,
+    flag: *mut [bool; 2],
 }
 
 unsafe impl Send for LockOne {}
@@ -22,9 +21,7 @@ impl LockOne {
     pub fn new() -> Self {
         let flag = Box::into_raw(Box::new([false, false]));
 
-        Self {
-            flag: Arc::new(flag),
-        }
+        Self { flag }
     }
 }
 
@@ -33,14 +30,14 @@ impl LockOneT for LockOne {
         let j = 1 - id;
 
         unsafe {
-            (*(*self.flag))[id] = true;
-            while (*(*self.flag))[j] == true {}
+            (*self.flag)[id] = true;
+            while (*self.flag)[j] == true {}
         }
     }
 
     fn unlock(&self, id: usize) {
         unsafe {
-            (*(*self.flag))[id] = false;
+            (*self.flag)[id] = false;
         }
     }
 }
