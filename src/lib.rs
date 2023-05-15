@@ -1,5 +1,8 @@
+pub mod bakery;
+pub mod filter;
 pub mod lock_one;
 pub mod lock_two;
+pub mod peterson;
 
 use std::{
     collections::HashMap,
