@@ -1,46 +1,8 @@
 use std::thread;
 use std::time::Duration;
 
-use locks::LockID as LockOneT;
-
-struct LockOne {
-    flag: *mut [bool; 2],
-}
-
-unsafe impl Send for LockOne {}
-
-impl Clone for LockOne {
-    fn clone(&self) -> Self {
-        Self {
-            flag: self.flag.clone(),
-        }
-    }
-}
-
-impl LockOne {
-    pub fn new() -> Self {
-        let flag = Box::into_raw(Box::new([false, false]));
-
-        Self { flag }
-    }
-}
-
-impl LockOneT for LockOne {
-    fn lock(&self, id: usize) {
-        let j = 1 - id;
-
-        unsafe {
-            (*self.flag)[id] = true;
-            while (*self.flag)[j] == true {}
-        }
-    }
-
-    fn unlock(&self, id: usize) {
-        unsafe {
-            (*self.flag)[id] = false;
-        }
-    }
-}
+use locks::lock_one::LockOne;
+use locks::Lock;
 
 fn main() {
     let lock = LockOne::new();
@@ -48,12 +10,12 @@ fn main() {
     let lock_a = lock.clone();
     let jh1 = thread::spawn(move || loop {
         let id = 0;
-        lock_a.lock(id);
+        lock_a.lock();
 
         eprintln!("Acquired lock for {id}");
         thread::sleep(Duration::from_secs(2));
 
-        lock_a.unlock(id);
+        lock_a.unlock();
     });
 
     let lock_b = lock.clone();
@@ -65,12 +27,12 @@ fn main() {
 
         loop {
             let id = 1;
-            lock_b.lock(id);
+            lock_b.lock();
 
             eprintln!("Acquired lock for {id}");
             thread::sleep(Duration::from_secs(3));
 
-            lock_b.unlock(id);
+            lock_b.unlock();
         }
     });
 
