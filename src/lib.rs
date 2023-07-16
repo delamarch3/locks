@@ -3,6 +3,7 @@ pub mod filter;
 pub mod lock_one;
 pub mod lock_two;
 pub mod peterson;
+pub mod practical;
 
 use std::{
     collections::HashMap,
