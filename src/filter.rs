@@ -1,12 +1,18 @@
-use crate::{Lock, ThreadIds};
+use std::cell::Cell;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::Lock;
+
+pub static THREAD_IDS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static THREAD_ID: Cell<usize> = Cell::new(THREAD_IDS.fetch_add(1, Ordering::Relaxed));
+}
 
 #[derive(Clone)]
 pub struct FilterLock {
     level: *mut Vec<usize>,
     victim: *mut Vec<usize>,
     n: usize,
-
-    thread_ids: ThreadIds,
 }
 
 unsafe impl Send for FilterLock {}
@@ -15,20 +21,14 @@ impl FilterLock {
     pub fn new(n: usize) -> Self {
         let level = Box::into_raw(Box::new(vec![0; n]));
         let victim = Box::into_raw(Box::new(vec![0; n]));
-        let thread_ids = ThreadIds::new();
 
-        Self {
-            level,
-            victim,
-            n,
-            thread_ids,
-        }
+        Self { level, victim, n }
     }
 }
 
 impl Lock for FilterLock {
     fn lock(&self) {
-        let me = self.thread_ids.get_id();
+        let me = THREAD_ID.get();
 
         unsafe {
             // When i = n - 1, we can enter critical section
@@ -48,7 +48,7 @@ impl Lock for FilterLock {
     }
 
     fn unlock(&self) {
-        let me = self.thread_ids.get_id();
+        let me = THREAD_ID.get();
 
         unsafe {
             (*self.level)[me] = 0;

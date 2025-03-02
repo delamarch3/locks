@@ -1,26 +1,26 @@
-use crate::{Lock, ThreadIds};
+use std::cell::Cell;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::Lock;
+
+pub static THREAD_IDS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static THREAD_ID: Cell<usize> = Cell::new(THREAD_IDS.fetch_add(1, Ordering::Relaxed));
+}
 
 #[derive(Clone)]
 pub struct Bakery {
     flag: *mut Vec<bool>,
     label: *mut Vec<usize>,
     n: usize,
-
-    thread_ids: ThreadIds,
 }
 
 impl Bakery {
     pub fn new(n: usize) -> Self {
         let flag = Box::into_raw(Box::new(vec![false; n]));
         let label = Box::into_raw(Box::new(vec![0; n]));
-        let thread_ids = ThreadIds::new();
 
-        Self {
-            flag,
-            label,
-            n,
-            thread_ids,
-        }
+        Self { flag, label, n }
     }
 }
 
@@ -28,7 +28,7 @@ unsafe impl Send for Bakery {}
 
 impl Lock for Bakery {
     fn lock(&self) {
-        let id = self.thread_ids.get_id();
+        let id = THREAD_ID.get();
 
         unsafe {
             // Doorway section completes in a bounded numebr of steps (bounded wait-free)
@@ -56,7 +56,7 @@ impl Lock for Bakery {
     }
 
     fn unlock(&self) {
-        let id = self.thread_ids.get_id();
+        let id = THREAD_ID.get();
 
         unsafe {
             (*self.flag)[id] = false;

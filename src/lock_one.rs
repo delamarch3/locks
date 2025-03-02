@@ -1,9 +1,15 @@
-use crate::{Lock, ThreadIds};
+use std::cell::Cell;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::Lock;
+
+pub static THREAD_IDS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static THREAD_ID: Cell<usize> = Cell::new(THREAD_IDS.fetch_add(1, Ordering::Relaxed));
+}
 
 pub struct LockOne {
     flag: *mut [bool; 2],
-
-    thread_ids: ThreadIds,
 }
 
 unsafe impl Send for LockOne {}
@@ -12,8 +18,6 @@ impl Clone for LockOne {
     fn clone(&self) -> Self {
         Self {
             flag: self.flag.clone(),
-
-            thread_ids: self.thread_ids.clone(),
         }
     }
 }
@@ -21,15 +25,14 @@ impl Clone for LockOne {
 impl LockOne {
     pub fn new() -> Self {
         let flag = Box::into_raw(Box::new([false, false]));
-        let thread_ids = ThreadIds::new();
 
-        Self { flag, thread_ids }
+        Self { flag }
     }
 }
 
 impl Lock for LockOne {
     fn lock(&self) {
-        let id = self.thread_ids.get_id();
+        let id = THREAD_ID.get();
 
         let j = 1 - id;
 
@@ -40,7 +43,7 @@ impl Lock for LockOne {
     }
 
     fn unlock(&self) {
-        let id = self.thread_ids.get_id();
+        let id = THREAD_ID.get();
 
         unsafe {
             (*self.flag)[id] = false;
